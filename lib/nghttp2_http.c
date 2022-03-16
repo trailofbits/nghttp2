@@ -334,30 +334,33 @@ int nghttp2_http_on_header(nghttp2_session *session, nghttp2_stream *stream,
                            int trailer) {
   int rv;
 
-  /* We are strict for pseudo header field.  One bad character should
-     lead to fail.  OTOH, we should be a bit forgiving for regular
-     headers, since existing public internet has so much illegal
-     headers floating around and if we kill the stream because of
-     this, we may disrupt many web sites and/or libraries.  So we
-     become conservative here, and just ignore those illegal regular
-     headers. */
-  if (!nghttp2_check_header_name(nv->name->base, nv->name->len)) {
-    size_t i;
-    if (nv->name->len > 0 && nv->name->base[0] == ':') {
-      return NGHTTP2_ERR_HTTP_HEADER;
-    }
-    /* header field name must be lower-cased without exception */
-    for (i = 0; i < nv->name->len; ++i) {
-      uint8_t c = nv->name->base[i];
-      if ('A' <= c && c <= 'Z') {
+  /* Header validation can be optionally handled by the caller */
+  if ((session->opt_flags & NGHTTP2_OPTMASK_NO_HEADER_VALIDATION) == 0) {
+    /* We are strict for pseudo header field.  One bad character should
+      lead to fail.  OTOH, we should be a bit forgiving for regular
+      headers, since existing public internet has so much illegal
+      headers floating around and if we kill the stream because of
+      this, we may disrupt many web sites and/or libraries.  So we
+      become conservative here, and just ignore those illegal regular
+      headers. */
+    if (!nghttp2_check_header_name(nv->name->base, nv->name->len)) {
+      size_t i;
+      if (nv->name->len > 0 && nv->name->base[0] == ':') {
         return NGHTTP2_ERR_HTTP_HEADER;
       }
+      /* header field name must be lower-cased without exception */
+      for (i = 0; i < nv->name->len; ++i) {
+        uint8_t c = nv->name->base[i];
+        if ('A' <= c && c <= 'Z') {
+          return NGHTTP2_ERR_HTTP_HEADER;
+        }
+      }
+      /* When ignoring regular headers, we set this flag so that we
+        still enforce header field ordering rule for pseudo header
+        fields. */
+      stream->http_flags |= NGHTTP2_HTTP_FLAG_PSEUDO_HEADER_DISALLOWED;
+      return NGHTTP2_ERR_IGN_HTTP_HEADER;
     }
-    /* When ignoring regular headers, we set this flag so that we
-       still enforce header field ordering rule for pseudo header
-       fields. */
-    stream->http_flags |= NGHTTP2_HTTP_FLAG_PSEUDO_HEADER_DISALLOWED;
-    return NGHTTP2_ERR_IGN_HTTP_HEADER;
   }
 
   switch (nv->token) {
@@ -375,7 +378,12 @@ int nghttp2_http_on_header(nghttp2_session *session, nghttp2_stream *stream,
     rv = check_scheme(nv->value->base, nv->value->len);
     break;
   default:
-    rv = nghttp2_check_header_value(nv->value->base, nv->value->len);
+    /* Header validation can be optionally handled by the caller */
+    if ((session->opt_flags & NGHTTP2_OPTMASK_NO_HEADER_VALIDATION) == 0) {
+      rv = nghttp2_check_header_value(nv->value->base, nv->value->len);
+    } else {
+      rv = 1;
+    }
   }
 
   if (rv == 0) {

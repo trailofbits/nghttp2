@@ -519,6 +519,11 @@ static int session_new(nghttp2_session **session_ptr,
       (*session_ptr)->opt_flags |= NGHTTP2_OPTMASK_NO_CLOSED_STREAMS;
     }
 
+    if ((option->opt_set_mask & NGHTTP2_OPT_NO_HEADER_VALIDATION) &&
+        option->no_header_validation) {
+      (*session_ptr)->opt_flags |= NGHTTP2_OPTMASK_NO_HEADER_VALIDATION;
+    }
+
     if (option->opt_set_mask & NGHTTP2_OPT_MAX_OUTBOUND_ACK) {
       (*session_ptr)->max_outbound_ack = option->max_outbound_ack;
     }

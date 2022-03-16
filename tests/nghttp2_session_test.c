@@ -11940,6 +11940,7 @@ void test_nghttp2_http_trailer_headers(void) {
 void test_nghttp2_http_ignore_regular_header(void) {
   nghttp2_session *session;
   nghttp2_session_callbacks callbacks;
+  nghttp2_option *option;
   nghttp2_hd_deflater deflater;
   nghttp2_mem *mem;
   nghttp2_bufs bufs;
@@ -12055,6 +12056,38 @@ void test_nghttp2_http_ignore_regular_header(void) {
 
   CU_ASSERT(NGHTTP2_RST_STREAM == item->frame.hd.type);
   CU_ASSERT(1 == item->frame.hd.stream_id);
+
+  /* make sure that the callback for invalid
+     headers is not called when enabling
+     the no_header_validation option */
+  ud.invalid_header_cb_called = 0;
+
+  nghttp2_option_new(&option);
+  nghttp2_option_set_no_header_validation(option, 1);
+
+  nghttp2_session_server_new2(&session, &callbacks, &ud, option);
+
+  rv = nghttp2_session_mem_recv(session, bufs.head->buf.pos,
+                                nghttp2_buf_len(&bufs.head->buf));
+
+  CU_ASSERT(rv == (ssize_t)nghttp2_buf_len(&bufs.head->buf));
+
+  item = nghttp2_session_get_next_ob_item(session);
+
+  CU_ASSERT(0 == ud.invalid_header_cb_called);
+
+  nghttp2_option_set_no_header_validation(option, 0);
+
+  nghttp2_session_server_new2(&session, &callbacks, &ud, option);
+
+  rv = nghttp2_session_mem_recv(session, bufs.head->buf.pos,
+                                nghttp2_buf_len(&bufs.head->buf));
+
+  CU_ASSERT(rv == (ssize_t)nghttp2_buf_len(&bufs.head->buf));
+
+  item = nghttp2_session_get_next_ob_item(session);
+
+  CU_ASSERT(1 == ud.invalid_header_cb_called);
 
   nghttp2_session_del(session);
   nghttp2_bufs_free(&bufs);

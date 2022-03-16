@@ -2700,6 +2700,16 @@ NGHTTP2_EXTERN void nghttp2_option_set_no_closed_streams(nghttp2_option *option,
 /**
  * @function
  *
+ * This option prevents the library from validating headers. If this
+ * option is set to nonzero, applications should perform header validation
+ * on their own.
+ */
+NGHTTP2_EXTERN void nghttp2_option_set_no_header_validation(nghttp2_option *option,
+                                                            int val);
+
+/**
+ * @function
+ *
  * This function sets the maximum number of outgoing SETTINGS ACK and
  * PING ACK frames retained in :type:`nghttp2_session` object.  If
  * more than those frames are retained, the peer is considered to be
